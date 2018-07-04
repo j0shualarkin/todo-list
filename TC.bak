@@ -1,0 +1,51 @@
+#lang racket
+
+
+(begin-for-syntax (require syntax/parse))
+
+;; typecheck :: Expr -> TypeEnv -> Type 
+
+
+(define-syntax (typecheck body)
+  (syntax-case body ()
+    ((_ . body)
+     (let () 
+       (define expanded-body (local-expand #'body 'expression '()))
+       (define current-info (info "" "" ""))
+  
+       (let loop! ([nfo current-info]
+                   [stx expanded-body])
+         (syntax-parse stx #:literals (let-values)
+ 
+           [_ #:when (vector? stx)
+              (define current-todo
+                (syntax-property stx 'todo))
+              (vector-set! current-todo 1 "filler")
+              (vector-set! current-todo 0 "some info")]
+      
+           [(let-values ([(x) x-body:id]) body)
+
+            (set-info-alias! nfo (string-append (info-alias nfo)
+                                                (format "(≡ ~a ~a)"
+                                                        (syntax-e #'x)
+                                                        (syntax-e #'x-body))))
+            (loop! nfo #'body)]
+
+           [(let-values ([(x) x-body]) body)
+
+            (set-info-type! nfo (string-append (info-type nfo)
+                                               (format "(: ~a ~a)"
+                                                       (syntax-e #'x)
+                                                       'Type)))
+            (loop! nfo #'x-body)
+            (loop! nfo #'body)]
+      
+           [(a . d) (loop! nfo #'a) (loop! nfo #'d)]
+
+           [_ (void)]))
+       expanded-body)))) 
+
+(typecheck (let ([x 5])
+             (let ([y x])
+               (+ x y))))
+;; --> Number

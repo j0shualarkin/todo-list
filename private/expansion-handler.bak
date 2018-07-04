@@ -3,7 +3,7 @@
 (provide build-todo-info handle-expansion)
 
 (require  syntax/srcloc
-          "syntax-info.rkt" "goal-info.rkt")
+         "syntax-info.rkt" "goal-info.rkt")
 
 ;; traverse fully expanded syntax and produce a list suitable for building
 ;; an interval-map. This maps intervals of todos to their metadata.
@@ -11,10 +11,8 @@
   (define todo-info (make-hash))
   (define command-info (make-hash))
   (let loop ([stx stx])
-    
     ;; this-todo is either #f or a located todo
     (define these-todos (detect-todos stx))
-    
     ;; this-command is a list of located commands
     (define these-commands (detect-commands stx))
 
@@ -31,9 +29,7 @@
                            (match-define (vector old-todo old-summary) old)
                            (match-define (vector new-todo summary)
                              (located-value this-todo))
-                           ;; used to be a t-i, why did it used to be non booleans but now it is booleans?
-                           ;; is this how we "ditch the todos" as mentioned above?
-                           (vector (and (equal? old-todo new-todo) old-todo)  
+                           (vector (and (equal? old-todo new-todo) old-todo)
                                    (and (equal? old-summary summary) old-summary))]
                           [else (located-value this-todo)]))
                       #f)))

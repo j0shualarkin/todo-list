@@ -1,0 +1,152 @@
+#lang racket
+
+;; Joshua Larkin
+
+
+(begin-for-syntax (require syntax/parse)
+                  (struct located [location value] #:prefab)
+
+                  (define (prepare-info i)
+                    (let* ([TYPES (string-append "Types: " (info-type i))]
+                            [PROPS (string-append "Props: " (info-prop i))]
+                            [ALIAS (string-append "Alias: " (info-alias i))])
+                       (string-append TYPES "\n" PROPS "\n" ALIAS "\n")))
+                   
+                  
+                  (struct info (type prop alias) #:mutable)
+                  (struct command (name module-path function arguments) #:prefab))
+
+
+
+(define-syntax (TODO* stx)
+  (syntax-parse stx
+    [(_ msg:str)
+     ;; Expand a TODO to a runtime error
+     (define runtime
+       (syntax/loc stx
+         (error msg)))
+     ;; Attach a notice that it is a TODO to be filled out
+     (syntax-property runtime 'todo (vector "" ""))]))
+
+
+
+
+
+(define-syntax (typecheck body)
+  (syntax-case body ()
+    ((_ . body)
+     (let () 
+       (define expanded-body (local-expand #'body 'expression '()))
+       (define current-info (info "" "" ""))
+  
+       (let loop! ([nfo current-info]
+                   [stx expanded-body])
+         (println "have we been here before?")
+         (syntax-parse stx #:literals (let-values)
+ 
+           [_ #:when (vector? stx) 
+              (eprintf "hello")
+              (define current-todo
+                (syntax-property stx 'todo))
+              (vector-set! current-todo 1 "just a little string")
+              (vector-set! current-todo 0 "some information")]
+      
+           [(let-values ([(x) x-body:id]) body)
+
+            (set-info-alias! nfo (string-append (info-alias nfo) (format "(≡ ~a ~a)" (syntax-e #'x) (syntax-e #'x-body))))
+            (loop! nfo #'body)]
+
+           [(let-values ([(x) x-body]) body)
+
+            (set-info-type! nfo (string-append (info-type nfo) (format "(: ~a ~a)" (syntax-e #'x) 'Type)))
+            (loop! nfo #'x-body)
+            (loop! nfo #'body)]
+      
+           [(a . d) (loop! nfo #'a) (loop! nfo #'d)]
+
+           [_ (void)]))
+       expanded-body)))) 
+
+(typecheck (let ([x 5])
+             (let ([y x])
+               (TODO* "dog"))))
+
+
+
+
+
+
+
+#|
+
+
+#;
+(define-syntax (inner-TODO stx)
+  (define ctx (or (syntax-parameter-value #'definition-context) stx))
+  (syntax-parse stx
+    [(_ msg:string)
+     (define item
+       (located ctx
+                (todo-item (syntax->datum #'msg)
+                           (syntax-parse ctx
+                             #:literals (define/todos)
+                             ;[(define/todos x e) (syntax->datum #'x)]
+                             [_ (syntax->datum #'msg)]))))
+     (syntax-property (syntax/loc stx (error 'inner-todo msg)) 'todo item)]))
+
+
+(define (info-print info port mode)
+  (let* ([TYPES (string-append "Types: " (info-type info))]
+         [PROPS (string-append "Props: " (info-prop info))]
+         [ALIAS (string-append "Alias: " (info-alias info))])
+    (writeln TYPES port)
+    (writeln PROPS port)
+    (writeln ALIAS port)))
+
+
+(struct info (type prop alias)
+    #:mutable
+    #:methods gen:custom-write
+    [(define write-proc info-print)])
+
+(define sample-info (info "(: x Int), (: y Int)" "" "(≡ x y)"))
+(displayln sample-info)
+
+(set-info-prop! sample-info "(> x 0)")
+(display sample-info)
+
+
+#;
+(define-syntax (typecheck body)
+  (define expanded-body (local-expand body 'expression '()))
+  ;(define current-info (info "" "" ""))
+  
+  (let loop! ([env '()]
+              [stx expanded-body])
+    
+    (syntax-parse stx #:literals (let-values)
+
+      [_ #:when (todo-item? (syntax-property stx 'todo "3args?"))
+
+         (set-todo-item-summary! stx (info-print some-info some-port #t))
+         ;; I want the port to be the todo-item-summary that I'm mutating, right?
+         
+         ;; also I don't know that the string the todo-summary wants is
+         ;; going to come from info-print, since its a void method
+
+         ;; how should i be using the env to fill in the info struct properly
+         (set-todo-item-full! stx (info-print some-info some-port #t))]
+      
+      [(let-values ([(x) x-body:id]) body)
+       (loop! (cons (cons #'x #'x-body) env) #'body)]
+      ;; should I be converting the env to the info struct once we hit a todo item
+      
+      [(let-values ([(x) x-body]) body)
+       (loop! env #'x-body)
+       (loop! (cons (cons #'x 'Type) env) #'body)]
+      
+      [(a . d) (loop! env #'a) (loop! env #'d)]
+      
+      [_ (void)])))
+
+|#

@@ -29,7 +29,8 @@
         (define (update-pos)
           (define pos (get-start-position))
           (define tab-info (hash-ref hole-info (get-tab) #f))
-          (match (and hole-info tab-info
+          (match (and hole-info
+                      tab-info
                       (interval-map-ref tab-info pos #f))
             [#f (send (send (get-tab) get-frame) set-current-todo #f)]
             [(and g (todo-info _ i))
@@ -221,7 +222,7 @@
                    (inherit append clear get-selection select set-selection)
                    (define/public (on-new-todo-list gs)
                      (clear)
-                     (define defns (get-definitions-text)) 
+                     (define defns (get-definitions-text))
                      (for ([(k g) (in-dict gs)])
                        (match-define (vector full summary) (todo-info-meta g))
                        (define line (send defns position-line (car k)))
@@ -229,7 +230,6 @@
                        (send hole-list-box append (number->string (add1 line)) (cons k g))
                        (define count (send hole-list-box get-number))
                        (send hole-list-box set-string (sub1 count) (number->string col) 1)
-                       
                        (send hole-list-box set-string
                              (sub1 count)
                              (truncate-summary (format "~a" summary)) 2)))
@@ -237,7 +237,6 @@
                      (if g
                          (set-selection (todo-info-index g))
                          (let ([sel (get-selection)])
-                           
                            (when sel (select sel #f))))))
                  [parent hole-holder]
                  [label #f]
