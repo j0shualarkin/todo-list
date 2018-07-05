@@ -74,14 +74,15 @@
               (-> 'Number (-> 'Number 'Number)))
 
 ;; application
-#;#;
-(check-equal? (findtype ((λ ([x : Number]) (add1 (add1 x))) 5))
-              #'Number)
 
-(check-equal? (findtype ((λ ([x : Number])
-                          (λ ([y : Number])
-                            y)) 2))
-              #'(-> Number Number))
+(check-equal? (findtype ((λ (x) Number (add1 (add1 x))) 5))
+              'Number)
+
+(check-equal? (findtype
+               ((λ (x) Number
+                  (λ (y) Number
+                    y)) 2))
+              (-> 'Number 'Number))
 
 
 
