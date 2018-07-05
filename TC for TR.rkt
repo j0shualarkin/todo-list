@@ -19,9 +19,6 @@
 (extend '((x . Nat) (y . Nat)) 'z 'String)
 
 
-
-
-
 (: lookup (-> Id TypeEnv Type))
 ;; lookup returns the type that the given identifier maps to
 ;; an id not seen before will produce an error
@@ -30,6 +27,7 @@
     (if maybe-type (cdr maybe-type)
         (error 'lookup "could not find a type for ~a in ~a" x Γ))))
 
+
 (: find-+ (-> Type Type Type))
 ;; helper function to findtype
 ;; (+ n1 n2) is a Number when n1 is a Number and n2 is a Number
@@ -37,6 +35,7 @@
   (match* (t1 t2)
     [('Number 'Number) 'Number]
     [(_ _) (error '+ "expects two Numbers got: ~a ~a" t1 t2)]))
+
 
 (: findtype (-> Any TypeEnv Type))
 ;; takes a program and returns its type
