@@ -2,7 +2,7 @@
 
 ;; Joshua Larkin
 
-;; David Christiansen, Andrew Kent, Sam Tobin-Hochstadt
+;; David Christiansen, Andrew Kent
 
 
 (begin-for-syntax (require syntax/parse)
