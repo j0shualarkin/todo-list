@@ -1,20 +1,25 @@
 #lang racket
 
 (require (for-syntax syntax/parse
-                     racket/match))
+                     racket/match)
+         rackunit)
 
 
 ;; A FreeId is a FreeIdentifier (compile-time identifier)
 ;; A TypeEnv is a (Listof (Listof FreeId FreeId))
 
-(begin-for-syntax (define typetable (make-hash)))
+;; typetable is a global mapping from expressions to types
+;; each time we `findtype` of an expr, we store the result
+;;  | type in this table
+(define-for-syntax typetable
+  (make-hash))
 
 ;; Simple types for this subset of psuedo-TypedRacket
 (define Number 'Number)
 (define String 'String)
 (define ⊥ '⊥)
 
-;; init-Γ is for testing programs so add1 is known to have a type
+;; init-Γ is for testing programs so add1 ... have known types
 (define-for-syntax init-Γ 
   (list (list #'add1  #'(list (quote ->) Number Number))
         (list #'+     #'(list (quote ->) Number Number Number))
@@ -76,12 +81,14 @@
        (syntax/loc stx
          (error msg)))
      ;; Attach a notice that it is a TODO to be filled out
-     (syntax-property runtime 'todo (vector "-----------------"
+     (syntax-property runtime 'todo (vector "--------------------\n"
                                             (syntax->datum #'msg)))]))
 
 (define-for-syntax (TC-simple expected T)
-  (if expected (if (free-identifier=? T expected) T (error 'TC-simple (format "failed to checke that ~a was type ~a" T expected)))
-      T))
+  (match expected
+    (#f T)
+    (E (if (free-identifier=? T E) T
+           (error 'TC-simple (format "failed to check that ~a was type ~a" T expected))))))
 
 (define-syntax (findtype stx)
   (syntax-case stx ()
@@ -103,7 +110,9 @@
                   (begin
                     ;; update the todo's information
                     (let ([new-info (string-append (env->string Γ)
-                                                   (vector-ref this-todo 0))])
+                                                   (vector-ref this-todo 0)
+                                                   (if expected (format "Expected Type: ~a" (syntax->datum expected)) ""
+                                                   ))])
                       (vector-set! this-todo 0 new-info))
                     ;; make sure we don't see this one again
                     (check (syntax-property stx 'todo #f) Γ expected))
@@ -126,49 +135,39 @@
              ;; synth mode for let:
              [(let-values ([(x:id) val]) body) (check #'body (extend-Γ Γ #'x (check #'val Γ #f)) expected)]
 
-             #;[(lambda (x:id) X body)
-
-              (with-syntax ([Y (check #'body (extend-Γ Γ #'x #'X) #f)])
-                #'(list (quote ->) X Y))]
              
              [(lambda (x:id) X body)
               (syntax-parse expected #:literals (quote)
-                ((list (quote ->) DOM RNG) #`(list (quote ->) DOM #,(check #'body (extend-Γ Γ #'x #'DOM) #'RNG))))
-              #;
-              (with-syntax ([Y (check #'body (extend-Γ Γ #'x #'X) #f)])
-                #'(list (quote ->) X Y))]
+                [(list (quote ->) DOM RNG) (check #'body (extend-Γ Γ #'x #'DOM) #'RNG)]
+                [#f (with-syntax ([Y (check #'body (extend-Γ Γ #'x #'X) #f)])
+                      #'(list (quote ->) X Y))]
+                [_ (raise-syntax-error 'check/lambda (format "expected an arrow type got: ~a" expected))])]
              
-             [(#%expression (lambda (x:id) X body))
-              (with-syntax ([Y (check #'body (extend-Γ Γ #'x #'X) #f)])
-                #'(list (quote ->) X Y))]
              
              [(#%plain-app rator rand)
               (let ([arrow (check #'rator Γ #f)])
                 (syntax-case arrow (quote)
                   ((list (quote ->) DOM RNG)
                    (let ([Y (check #'rand Γ #'DOM)])
-                     (if Y #'RNG (error "bad app case"))))))]
+                     (if Y #'RNG (error "bad app case"))))
+                  [_ (raise-syntax-error 'check/app
+                                         (format "expected operator to be an arrow type, got: ~a" arrow))]))]
+             [(#%expression e) (check #'e Γ expected)]
              
              [_ (raise-syntax-error 'findtype/check "no pattern found for given stx" stx)])))
        exp-body)]))
 
-;; have to return exp-body to get the TODO window activated
-;; but have to return type to get the type of the expression
+;; map exp-body to the result of findtype in the global type-table
 
-(require rackunit)
 
+ ;; uncomment and make sure find-type returns exp-body in order to see the TODO window
 (findtype
  (let ([x 5])
    (let ([y 7])
      (let [[z y]]
        (add1 (TODO* "ex1"))))))
 
-(findtype
- (let ([x 5])
-   (let ([y 7])
-     (let [[z y]]
-       (add1 (TODO* "ex2"))))))
-
+(findtype (TODO* "a"))
 
 
 
