@@ -42,7 +42,7 @@
 ;;   the second term is of the domain
 ;; otherwise an error is thrown
 (define-for-syntax (check/app τ-rator τ-rand)
-    (syntax-case τ-rator (quote) 
+  (syntax-case τ-rator (quote) 
       [(list (quote ->) A B)
        (if (or (free-identifier=? #'A τ-rand)
                (free-identifier=? #'⊥ τ-rand))
@@ -76,9 +76,12 @@
        (syntax/loc stx
          (error msg)))
      ;; Attach a notice that it is a TODO to be filled out
-     (syntax-property runtime 'todo (vector ":-)"
+     (syntax-property runtime 'todo (vector "-----------------"
                                             (syntax->datum #'msg)))]))
 
+(define-for-syntax (TC-simple expected T)
+  (if expected (if (free-identifier=? T expected) T (error 'TC-simple (format "failed to checke that ~a was type ~a" T expected)))
+      T))
 
 (define-syntax (findtype stx)
   (syntax-case stx ()
@@ -88,55 +91,83 @@
        ;; if you get bottom type, youve got absurd so you can say anything
        (define type
          (let check ([stx exp-body]
-                     [Γ init-Γ])
+                     [Γ init-Γ]
+                     [expected #f])
            (syntax-parse stx
              #:literals (let-values λ #%plain-app
                           #%expression add1 + TODO*)
              [e
               #:when (syntax-property stx 'todo)
               (define this-todo (syntax-property stx 'todo))
-              (eprintf "pre: ~a\n" this-todo)
-              ;(displayln (env->string Γ))
               (if (vector? this-todo)
                   (begin
                     ;; update the todo's information
                     (let ([new-info (string-append (env->string Γ)
                                                    (vector-ref this-todo 0))])
-                      (eprintf "new info: ~a\n" new-info)
-                      (vector-set! this-todo 1 "not oops")
                       (vector-set! this-todo 0 new-info))
-                    (eprintf "post: ~a\n" this-todo)
-                    
                     ;; make sure we don't see this one again
-                    #;(check (syntax-property stx 'todo #f) Γ)
-                    #'⊥)
-                  
+                    (check (syntax-property stx 'todo #f) Γ expected))
+                  ;; -- end of begin expr
                   (raise-syntax-error 'findtype/stx-prop-todo
                    "expected TODO* to be a vector got: " stx))]
-             [x:id (lookup #'x Γ)]
-             [n:nat #'Number]
-             [(add1 n:nat) #'Number]
+
+             ;; updated to switch between check and synth mode
+             [x:id (TC-simple expected (lookup #'x Γ))]
+             ;; new nat case
+             [n:nat (TC-simple expected #'Number)]
+             [(add1 n:nat) (TC-simple expected #'Number)]
              ;[(+ m:nat n:nat) #'Number]
-             [(quote n:nat) #'Number]
-             [(quote s:string) #'String]
-             [(let-values ([(x:id) y:id]) body) (check #'body (extend-Γ Γ #'y (lookup #'x Γ)))] ;; alias case
-             [(let-values ([(x:id) val]) body) (check #'body (extend-Γ Γ #'x (check #'val Γ)))]
+             [(quote n:nat) (TC-simple expected #'Number)]
+             [(quote s:string) (TC-simple expected #'String)]
+
+             ;[(let-values ([(x:id) y:id]) body) (check #'body (extend-Γ Γ #'x (lookup #'y Γ)))] ;; alias case
+             ;; check-mode for let
+             [(let-values ([(x:id) val]) T body) (check #'body (extend-Γ Γ #'x #'T) expected)]
+             ;; synth mode for let:
+             [(let-values ([(x:id) val]) body) (check #'body (extend-Γ Γ #'x (check #'val Γ #f)) expected)]
+
+             #;[(lambda (x:id) X body)
+
+              (with-syntax ([Y (check #'body (extend-Γ Γ #'x #'X) #f)])
+                #'(list (quote ->) X Y))]
+             
              [(lambda (x:id) X body)
-              (with-syntax ([Y (check #'body (extend-Γ Γ #'x #'X))])
+              (syntax-parse expected #:literals (quote)
+                ((list (quote ->) DOM RNG) #`(list (quote ->) DOM #,(check #'body (extend-Γ Γ #'x #'DOM) #'RNG))))
+              #;
+              (with-syntax ([Y (check #'body (extend-Γ Γ #'x #'X) #f)])
                 #'(list (quote ->) X Y))]
+             
              [(#%expression (lambda (x:id) X body))
-              (with-syntax ([Y (check #'body (extend-Γ Γ #'x #'X))])
+              (with-syntax ([Y (check #'body (extend-Γ Γ #'x #'X) #f)])
                 #'(list (quote ->) X Y))]
-             [(#%plain-app rator rand) (check/app (check #'rator Γ) (check #'rand Γ))]
+             
+             [(#%plain-app rator rand)
+              (let ([arrow (check #'rator Γ #f)])
+                (syntax-case arrow (quote)
+                  ((list (quote ->) DOM RNG)
+                   (let ([Y (check #'rand Γ #'DOM)])
+                     (if Y #'RNG (error "bad app case"))))))]
+             
              [_ (raise-syntax-error 'findtype/check "no pattern found for given stx" stx)])))
-       #'body)]))
+       exp-body)]))
 
-
+;; have to return exp-body to get the TODO window activated
+;; but have to return type to get the type of the expression
 
 (require rackunit)
-(findtype (let ([x 5])
-            (let ([y 7])
-              (add1 (TODO* "oops")))))
+
+(findtype
+ (let ([x 5])
+   (let ([y 7])
+     (let [[z y]]
+       (add1 (TODO* "ex1"))))))
+
+(findtype
+ (let ([x 5])
+   (let ([y 7])
+     (let [[z y]]
+       (add1 (TODO* "ex2"))))))
 
 
 
@@ -148,51 +179,57 @@
 
 ;; get the gui thing working again so if a TODO* is
 ;; seen it'll pop up and say what it's type is
-;
-;;; numbers
-;(check-equal? (findtype 5)
-;              'Number)
-;
-;(check-equal? (findtype (add1 5))
-;              'Number)
+
+;; numbers
+(check-equal? (findtype 5)
+              'Number)
+
+(check-equal? (findtype (add1 5))
+              'Number)
 ;;; let
-;(check-equal? (findtype (let ([x 5]) x))
-;              'Number)
+(check-equal? (findtype (let ([x 5]) x))
+              'Number)
+
+(check-equal? (findtype (let ([x 5]) (add1 x)))
+              'Number)
+
+(check-equal? (findtype (let ([x 5]) Number (add1 x)))
+              'Number)
 ;
-;(check-equal? (findtype (let ([x 5]) (add1 x)))
-;              'Number)
-;
-;;; lambda
-;(check-equal? (findtype (λ (x) Number x))
-;              '(-> Number Number))
-;
-;
-;(check-equal? (findtype (λ (x) Number
-;                            (λ (y) Number
-;                              y)))
-;              '(-> Number (-> Number Number)))
-;#;
+;; lambda
+(check-equal? (findtype (λ (x) Number x))
+              '(-> Number Number))
+
+
+(check-equal? (findtype (λ (x) Number
+                            (λ (y) Number
+                              y)))
+              '(-> Number (-> Number Number)))
+
 ;(findtype (λ (x y) (-> Number Number)))
 ;
 ;;; application
 ;
-;(check-equal? (findtype ((λ (x) Number (add1 (add1 x))) 5))
-;              'Number)
-;
-;(check-equal? (findtype
-;               ((λ (x) Number
-;                  (λ (y) Number
-;                    y)) 2))
-;              '(-> Number Number))
-;
-;; sorry im late but it was for a good cause,
-;; i just had half of the most delicious cinnamon roll
-;
-;
-;#|
-;    notes on aliasing:
-;
-;   how to know that we've come across an alias later
-;   if we just mark y with the type we found for x
-;
-;|#
+(check-equal? (findtype ((λ (x) Number (add1 (add1 x))) 5))
+              'Number)
+
+(check-equal? (findtype
+               ((λ (x) Number
+                  (λ (y) Number
+                    y)) 2))
+              '(-> Number Number))
+
+(check-equal?
+ (findtype (let ([f (λ (x) Number
+                      (λ(y) String
+                        y))])
+             (f 2)))
+ '(-> String String))
+
+#;
+(check-equal? (findtype
+               (let ([f (λ(x) Number
+                          (λ (y) String
+                            (add1 x)))]) (list (quote ->) Number (list (quote ->) String Number))
+                 ((f 2) "dog")))
+              'Number)
