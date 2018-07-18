@@ -28,7 +28,7 @@
        (syntax/loc stx
          (error msg)))
      ;; Attach a notice that it is a TODO to be filled out
-     (syntax-property runtime 'todo (vector (prepare-info curr-info) "summary"))]))
+     (syntax-property runtime 'todo (vector "full"#;(prepare-info curr-info) "summary"))]))
 ;; I think summary is going to overwrite everytime, would prefer it be msg
 
 

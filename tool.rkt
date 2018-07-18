@@ -156,6 +156,8 @@
             (send l on-new-todo-list gs)))
 
         (define current-todo-listeners (box null))
+
+        ;; Line in question
         (define/public (set-current-todo g)
           (for ([l (unbox current-todo-listeners)])
             (send l on-new-current-todo g)))
@@ -221,7 +223,7 @@
                    (inherit append clear get-selection select set-selection)
                    (define/public (on-new-todo-list gs)
                      (clear)
-                     (define defns (get-definitions-text)) 
+                     (define defns (get-definitions-text))
                      (for ([(k g) (in-dict gs)])
                        (match-define (vector full summary) (todo-info-meta g))
                        (define line (send defns position-line (car k)))

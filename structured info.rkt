@@ -21,10 +21,10 @@
   #:methods gen:custom-write
   [(define write-proc info-print)])
 
-
+#;#;
 (define sample-info (info "(: x Int), (: y Int)" "" "(≡ x y)"))
 (displayln sample-info)
-
+#;#;
 (set-info-prop! sample-info "(> x 0)")
 (display sample-info)
 
@@ -33,7 +33,7 @@
 
 (begin-for-syntax
   ;; structures for TODO and showing the environment
-  (struct command (name module-path function arguments) #:prefab)
+  ;(struct command (name module-path function arguments) #:prefab)
   (struct env (types props aliases) #:transparent)
 
 
@@ -79,11 +79,13 @@
          (error msg)))
      
      (syntax-property runtime 'todo
-                       (let ([le (lexical-env)])
-                         (build-info (syntax->datum #'msg)
-                                     (clean-up (env-types le) ':)
-                                     (env-props le)
-                                     (clean-up (env-aliases le) '≡))))]))
+                       (vector
+                        (let ([le (lexical-env)])
+                          (build-info (syntax->datum #'msg)
+                                      (clean-up (env-types le) ':)
+                                      (env-props le)
+                                      (clean-up (env-aliases le) '≡)))
+                        (syntax->datum #'msg)))]))
 
 
 (define-syntax (let^ stx)
@@ -127,6 +129,7 @@
                                     [types (cons (cons (syntax-e #'x) (syntax-e #'t))
                                                  (env-types (lexical-env)))])])
        (local-expand #'(let ([x v]) bodies ...) 'expression '()))]))
+
 
 
 
