@@ -8,12 +8,6 @@
 ;; A FreeId is a FreeIdentifier (compile-time identifier)
 ;; A TypeEnv is a (Listof (Listof FreeId FreeId))
 
-;; typetable is a global mapping from expressions to types
-;; each time we `findtype` of an expr, we store the result
-;;  | type in this table
-(define-for-syntax typetable
-  (make-hash))
-
 ;; Simple types for this subset of psuedo-TypedRacket
 (define Number 'Number)
 (define String 'String)
@@ -22,7 +16,7 @@
 ;; init-Γ is for testing programs so add1 ... have known types
 (define-for-syntax init-Γ 
   (list (list #'add1  #'(list (quote ->) Number Number))
-        (list #'+     #'(list (quote ->) Number Number Number))
+        #;(list #'+     #'(list (quote ->) Number Number Number))
         (list #'error #'(list (quote ->) String ⊥))))
 
 ;; extend-Γ :: TypeEnv FreeId FreeId -> TypeEnv
@@ -57,17 +51,17 @@
 
 
 (define-for-syntax (fixup T)
-  (syntax->datum T
-   #;(syntax-parse T #:literals (list quote ->)
-     ((list (quote ->) t0 ... t) #'(t0 ... -> t)))
-   ))
+  (syntax-parse T #:literals (list quote)
+    ((list (quote ->) A B) (syntax->datum #'(A -> B)))
+    ((list (quote ->) t0 t ...) (syntax->datum #`(t0 -> #,(fixup #`(list (quote ->) t ...)))))
+    (_ (syntax->datum T))))
 
 ;; env->string :: TypeEnv -> String
 ;; returns a string of all the variables in scope with their types
 (define-for-syntax (env->string Γ)
   (match Γ
     ((list) "")
-    ((list (list x0 T) pr ...) (string-append (format "(≡ ~a ~a)\n"
+    ((list (list x0 T) pr ...) (string-append (format "~a : ~a\n"
                                                       (syntax->datum x0)
                                                       (fixup T))
                                                (env->string pr)))))
@@ -111,7 +105,8 @@
                     ;; update the todo's information
                     (let ([new-info (string-append (env->string Γ)
                                                    (vector-ref this-todo 0)
-                                                   (if expected (format "Expected Type: ~a" (syntax->datum expected)) ""
+                                                   (if expected (format "expected type : ~a" #;(syntax->datum exp-body)
+                                                                        (syntax->datum expected)) ""
                                                    ))])
                       (vector-set! this-todo 0 new-info))
                     ;; make sure we don't see this one again
@@ -157,27 +152,16 @@
              [_ (raise-syntax-error 'findtype/check "no pattern found for given stx" stx)])))
        exp-body)]))
 
-;; map exp-body to the result of findtype in the global type-table
-
-
- ;; uncomment and make sure find-type returns exp-body in order to see the TODO window
+;; TODO examples 
 (findtype
  (let ([x 5])
    (let ([y 7])
      (let [[z y]]
        (add1 (TODO* "ex1"))))))
 
+
 (findtype (TODO* "a"))
 
-
-
- ;; this should say Number
-
-
-;; should be printing (≡ x Number) (≡ y Number)
-
-;; get the gui thing working again so if a TODO* is
-;; seen it'll pop up and say what it's type is
 
 ;; numbers
 (check-equal? (findtype 5)
@@ -206,9 +190,9 @@
               '(-> Number (-> Number Number)))
 
 ;(findtype (λ (x y) (-> Number Number)))
-;
-;;; application
-;
+
+;; application
+;;
 (check-equal? (findtype ((λ (x) Number (add1 (add1 x))) 5))
               'Number)
 
