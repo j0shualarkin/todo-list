@@ -1,5 +1,6 @@
 #lang typed/racket #:with-refinements
 
+
 (require typed/rackunit
          (only-in racket/unsafe/ops
                   unsafe-vector-ref
@@ -15,24 +16,6 @@
       'todo
       (vector "--------------------\n"
               (syntax->datum #'msg)))]))
-
-#;
-(let ([x 5])
-  (let ([y 6]) 
-    (let ([z x])
-      (+ x 6 (ann (TODO* "oops") Number)))))
-
-#;#;
-
-(: foo (-> Real Real))
-(define (foo x)
-  (if (<= x 12) (let ((y (+ x 2)))
-                  (/ y 2))
-      (ann (TODO* "help!") Real)))
-
-
-
-
 
 
 (: safe-vector-ref
@@ -77,6 +60,7 @@
    (All (E)
         (-> (Vectorof E)
             (Vectorof E))))
+
 ;; shift-left 
 ;;;; moves each item in the vector left once
 ;;;; putting the first element at the end
@@ -88,8 +72,7 @@
       [else (let loop
               ([i : (Refine [i : Integer]
                             (<= 0 i (- len 1))) 0])
-              (when (< i (- len 1))
-                
+              (when (< i (- len 1)) 
                 (TODO* "in the loop")
                 (swap v i (+ i 1))
                 (loop (+ i 1)))
@@ -104,34 +87,7 @@
 ;(check-equal? (shift-left (shift-left (vector 12 62 13 45)))
 ;             (vector 13 45 12 62))
 ;
+
+
+
 ;; ===================================================================
-
-#;
-(: shift-right : (All (E)
-                  (-> (Vectorof E)
-                      (Vectorof E))))
-#;
-(define (shift-right v)
-  (let ([len (vector-length v)])
-    (cond
-      [(<= len 1) v]
-      [else (let loop
-              ([i : (Refine [i : Integer]
-                            (<= 0 i (- len 1)))
-                  (- len 1)])
-              
-              (when (>= (- i 1) 0)
-                (swap v i (- i 1))
-                (loop (- i 1)))
-              
-              v)])))
-
-#;
-(check-equal? (shift-right (vector 'a 'b 'c 'd 'e))
-             '#(e a b c d))
-#;
-(check-equal? (shift-right (shift-right (vector 'a 'b 'c 'd 'e)))
-              '#(d e a b c))
-
-
-

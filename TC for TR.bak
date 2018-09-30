@@ -1,5 +1,0 @@
-#lang typed/racket
-
-
-(: xs (Listof (Pair Symbol Symbol)))
-(define xs '((x . Nat)))
